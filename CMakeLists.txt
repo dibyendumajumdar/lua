@@ -88,7 +88,7 @@ endif()
 
 # define the lua lib source files
 set(LUA_LIB_SRCS lauxlib.c lbaselib.c lbitlib.c lcorolib.c ldblib.c liolib.c
-        lmathlib.c loslib.c ltablib.c lstrlib.c loadlib.c linit.c lutf8lib.c)
+        lmathlib.c loslib.c ltablib.c lstrlib.c loadlib.c linit.c lutf8lib.c bit.c)
 
 file(GLOB ALL_HEADERS "${PROJECT_SOURCE_DIR}/*.h")
 set(LUA_HEADERS lua.h luaconf.h lualib.h lauxlib.h)
@@ -132,7 +132,7 @@ add_executable(lua lua.c)
 target_link_libraries(lua ${LIB_NAME})
 
 install(FILES ${LUA_HEADERS}
-        DESTINATION include/lua53)
+        DESTINATION include)
 install(TARGETS ${LIB_NAME} lua
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
