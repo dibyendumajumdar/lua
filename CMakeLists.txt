@@ -111,6 +111,7 @@ if (NOT STATIC_BUILD)
 endif()
 
 set(LIB_NAME lua53)
+set(STATIC_LIB_NAME lua53_static)
 #Main library
 add_library(${LIB_NAME} ${LIBLUA_BUILD_TYPE} 
         ${ALL_HEADERS}
@@ -125,13 +126,23 @@ if (NOT STATIC_BUILD)
 endif()
 target_link_libraries(${LIB_NAME} ${EXTRA_LIBRARIES})
 
+add_library(${STATIC_LIB_NAME} 
+        ${ALL_HEADERS}
+        ${LUA_LIB_SRCS} 
+        ${LUA_CORE_SRCS}
+        )
+target_link_libraries(${STATIC_LIB_NAME} ${EXTRA_LIBRARIES})
+
 # Lua executable
 add_executable(lua lua.c)
 target_link_libraries(lua ${LIB_NAME})
 
+add_executable(lua_s lua.c)
+target_link_libraries(lua_s ${STATIC_LIB_NAME})
+
 install(FILES ${LUA_HEADERS}
         DESTINATION include)
-install(TARGETS ${LIB_NAME} lua
+install(TARGETS ${LIB_NAME} lua lua_s
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)
