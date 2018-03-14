@@ -121,8 +121,6 @@ if (NOT STATIC_BUILD)
     if (WIN32)
         # enable DLL export
         set_target_properties(${LIB_NAME} PROPERTIES DEFINE_SYMBOL "LUA_BUILD_AS_DLL")
-    else()
-        set_target_properties(${LIB_NAME} PROPERTIES PREFIX "")
     endif ()
 endif()
 target_link_libraries(${LIB_NAME} ${EXTRA_LIBRARIES})
