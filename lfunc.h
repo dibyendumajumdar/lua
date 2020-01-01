@@ -34,7 +34,8 @@
 */
 struct UpVal {
   TValue *v;  /* points to stack or to its own value */
-  lu_mem refcount;  /* reference counter */
+  unsigned int refcount;  /* reference counter */
+  unsigned int flags; /* Used to mark deferred values */
   union {
     struct {  /* (when open) */
       UpVal *next;  /* linked list */
@@ -52,7 +53,7 @@ LUAI_FUNC CClosure *luaF_newCclosure (lua_State *L, int nelems);
 LUAI_FUNC LClosure *luaF_newLclosure (lua_State *L, int nelems);
 LUAI_FUNC void luaF_initupvals (lua_State *L, LClosure *cl);
 LUAI_FUNC UpVal *luaF_findupval (lua_State *L, StkId level);
-LUAI_FUNC void luaF_close (lua_State *L, StkId level);
+LUAI_FUNC int luaF_close (lua_State *L, StkId level, int status);
 LUAI_FUNC void luaF_freeproto (lua_State *L, Proto *f);
 LUAI_FUNC const char *luaF_getlocalname (const Proto *func, int local_number,
                                          int pc);
