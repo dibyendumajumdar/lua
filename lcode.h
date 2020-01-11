@@ -36,9 +36,10 @@ typedef enum BinOpr {
   OPR_NOBINOPR
 } BinOpr;
 
-
-typedef enum UnOpr { OPR_MINUS, OPR_BNOT, OPR_NOT, OPR_LEN, OPR_NOUNOPR } UnOpr;
-
+/** RAVI change */
+typedef enum UnOpr { OPR_MINUS, OPR_BNOT, OPR_NOT, OPR_LEN, OPR_TO_INTEGER,
+  OPR_TO_NUMBER, OPR_TO_INTARRAY, OPR_TO_NUMARRAY, OPR_TO_TABLE, OPR_TO_STRING, 
+  OPR_TO_CLOSURE, OPR_TO_TYPE, OPR_NOUNOPR } UnOpr;
 
 /* get (pointer to) instruction of given 'expdesc' */
 #define getinstruction(fs,e)	((fs)->f->code[(e)->u.info])

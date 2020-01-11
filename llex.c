@@ -44,7 +44,9 @@ static const char *const luaX_tokens [] = {
     "return", "then", "true", "until", "while",
     "//", "..", "...", "==", ">=", "<=", "~=",
     "<<", ">>", "::", "<eof>",
-    "<number>", "<integer>", "<name>", "<string>"
+    "<number>", "<integer>", "<name>", "<string>",
+    "@integer", "@number", "@integer[]", "@number[]",
+    "@table", "@string", "@closure"
 };
 
 
@@ -190,6 +192,16 @@ static int check_next1 (LexState *ls, int c) {
   }
   else return 0;
 }
+
+
+static int check_save_next1(LexState *ls, int c) {
+  if (ls->current == c) {
+    save_and_next(ls);
+    return 1;
+  }
+  else return 0;
+}
+
 
 
 /*
@@ -428,6 +440,40 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
                                    luaZ_bufflen(ls->buff) - 2);
 }
 
+/* 
+** RAVI extension: generate a token for the cast operators -
+** @number, @number[], @integer, @integer[], @table
+*/
+static int casttoken(LexState *ls, SemInfo *seminfo) {
+  size_t n = luaZ_bufflen(ls->buff);
+  const char *s = luaZ_buffer(ls->buff);
+  int tok;
+
+  /* @integer or @integer[] */
+  if (strncmp(s, "@integer", n) == 0) 
+    tok = TK_TO_INTEGER;
+  else if (strncmp(s, "@integer[]", n) == 0)
+    tok = TK_TO_INTARRAY;
+  /* @number or @number[] */
+  else if (strncmp(s, "@number", n) == 0)
+    tok = TK_TO_NUMBER;
+  else if (strncmp(s, "@number[]", n) == 0)
+    tok = TK_TO_NUMARRAY;
+  /* @table */
+  else if (strncmp(s, "@table", n) == 0)
+    tok = TK_TO_TABLE;
+  else if (strncmp(s, "@string", n) == 0)
+    tok = TK_TO_STRING;
+  else if (strncmp(s, "@closure", n) == 0)
+    tok = TK_TO_CLOSURE;
+  else {
+    seminfo->ts = luaX_newstring(ls, s+1, n-1); /* omit @ */
+    tok = '@';
+  }
+  luaZ_buffremove(ls->buff, n); /* rewind but buffer still holds the saved characters */
+  return tok;
+}
+
 
 static int llex (LexState *ls, SemInfo *seminfo) {
   luaZ_resetbuffer(ls->buff);
@@ -522,6 +568,16 @@ static int llex (LexState *ls, SemInfo *seminfo) {
       }
       case EOZ: {
         return TK_EOS;
+      }
+      case '@': {
+        /* RAVI change: @ introduces a type assertion operator */
+        save_and_next(ls);
+        while (lislalnum(ls->current)) {
+          save_and_next(ls);
+        }
+        check_save_next1(ls, '[');
+        check_save_next1(ls, ']');
+        return casttoken(ls, seminfo);
       }
       default: {
         if (lislalpha(ls->current)) {  /* identifier or reserved word? */

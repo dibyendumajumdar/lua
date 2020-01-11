@@ -756,7 +756,44 @@ static void constructor (LexState *ls, expdesc *t) {
 
 /* }====================================================================== */
 
+/* Ravi extension */
+static void user_defined_type_name(LexState *ls) {
+  if (testnext(ls, '.')) {
+    do {
+      str_checkname(ls);
+    } while (testnext(ls, '.'));
+  }
+}
 
+/* RAVI extension */
+static void declare_localvar(LexState *ls, TString *name) {
+  /* if the variable name is followed by a colon then we have a type
+   * specifier
+   */
+  if (testnext(ls, ':')) {
+    TString *typename = str_checkname(ls); /* we expect a type name */
+    const char *str = getstr(typename);
+    /* following is not very nice but easy as
+     * the lexer doesn't need to be changed
+     */
+    if (strcmp(str, "closure") == 0 ||
+        strcmp(str, "table") == 0 ||
+        strcmp(str, "string") == 0 ||
+        strcmp(str, "boolean") == 0 ||
+        strcmp(str, "any") == 0)
+      ; /* skip */
+    else if (strcmp(str, "integer") == 0 ||
+      strcmp(str, "number") == 0) {
+      if (testnext(ls, '[')) {
+        checknext(ls, ']');
+      }
+    }
+    else {
+      user_defined_type_name(ls);
+    }
+  }
+  new_localvar(ls, name);
+}
 
 static void parlist (LexState *ls) {
   /* parlist -> [ param { ',' param } ] */
@@ -768,7 +805,7 @@ static void parlist (LexState *ls) {
     do {
       switch (ls->t.token) {
         case TK_NAME: {  /* param -> NAME */
-          new_localvar(ls, str_checkname(ls));
+          declare_localvar(ls, str_checkname(ls));
           nparams++;
           break;
         }
@@ -999,6 +1036,14 @@ static UnOpr getunopr (int op) {
     case '-': return OPR_MINUS;
     case '~': return OPR_BNOT;
     case '#': return OPR_LEN;
+    case TK_TO_INTEGER: return OPR_TO_INTEGER;
+    case TK_TO_NUMBER: return OPR_TO_NUMBER;
+    case TK_TO_INTARRAY: return OPR_TO_INTARRAY;
+    case TK_TO_NUMARRAY: return OPR_TO_NUMARRAY;
+    case TK_TO_TABLE: return OPR_TO_TABLE;
+    case TK_TO_STRING: return OPR_TO_STRING;
+    case TK_TO_CLOSURE: return OPR_TO_CLOSURE;
+    case '@': return OPR_TO_TYPE;
     default: return OPR_NOUNOPR;
   }
 }
@@ -1050,6 +1095,34 @@ static const struct {
 
 #define UNARY_PRIORITY	12  /* priority for unary operators */
 
+/* Ravi extension - skip cast operator */
+UnOpr skip_cast_op(LexState* ls, UnOpr uop) {
+  while (uop == OPR_TO_TYPE ||
+        uop == OPR_TO_CLOSURE ||
+        uop == OPR_TO_INTARRAY ||
+        uop == OPR_TO_INTEGER ||
+        uop == OPR_TO_NUMARRAY ||
+        uop == OPR_TO_NUMBER ||
+        uop == OPR_TO_STRING ||
+        uop == OPR_TO_TABLE) {
+    if (uop == OPR_TO_TYPE) {
+      luaX_next(ls);
+      user_defined_type_name(ls);
+      uop = getunopr(ls->t.token);
+    }
+    else if (uop == OPR_TO_CLOSURE ||
+          uop == OPR_TO_INTARRAY ||
+          uop == OPR_TO_INTEGER ||
+          uop == OPR_TO_NUMARRAY ||
+          uop == OPR_TO_NUMBER ||
+          uop == OPR_TO_STRING ||
+          uop == OPR_TO_TABLE) {
+      luaX_next(ls);
+      uop = getunopr(ls->t.token);
+    }
+  }  
+  return uop;
+}
 
 /*
 ** subexpr -> (simpleexp | unop subexpr) { binop subexpr }
@@ -1059,7 +1132,7 @@ static BinOpr subexpr (LexState *ls, expdesc *v, int limit) {
   BinOpr op;
   UnOpr uop;
   enterlevel(ls);
-  uop = getunopr(ls->t.token);
+  uop = skip_cast_op(ls, getunopr(ls->t.token));
   if (uop != OPR_NOUNOPR) {
     int line = ls->linenumber;
     luaX_next(ls);
@@ -1461,7 +1534,7 @@ static void localstat (LexState *ls) {
   int nexps;
   expdesc e;
   do {
-    new_localvar(ls, str_checkname(ls));
+    declare_localvar(ls, str_checkname(ls));
     nvars++;
   } while (testnext(ls, ','));
   if (testnext(ls, '='))
