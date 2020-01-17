@@ -140,9 +140,24 @@ target_link_libraries(lua ${LIB_NAME})
 add_executable(lua_s lua.c)
 target_link_libraries(lua_s ${STATIC_LIB_NAME})
 
+configure_file(lua-config.cmake.in lua-config.cmake @ONLY)
+if (WIN32)
+    configure_file(lua-env.bat.in lua-env.bat @ONLY)
+    set(LUA_SCRIPTS ${CMAKE_CURRENT_BINARY_DIR}/lua-env.bat)
+elseif (APPLE)
+    configure_file(lua-env.osx.sh.in lua-env.sh @ONLY)
+    set(LUA_SCRIPTS ${CMAKE_CURRENT_BINARY_DIR}/lua-env.sh)
+else()
+    configure_file(lua-env.linux.sh.in lua-env.sh @ONLY)
+    set(LUA_SCRIPTS ${CMAKE_CURRENT_BINARY_DIR}/lua-env.sh)
+endif()
 install(FILES ${LUA_HEADERS}
         DESTINATION include)
 install(TARGETS ${LIB_NAME} lua lua_s
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)
+install(FILES ${LUA_SCRIPTS}
+        DESTINATION bin)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/lua-config.cmake
+        DESTINATION cmake)
