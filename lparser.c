@@ -52,6 +52,7 @@ typedef struct BlockCnt {
   lu_byte nactvar;  /* # active locals outside the block */
   lu_byte upval;  /* true if some variable in the block is an upvalue */
   lu_byte isloop;  /* true if 'block' is a loop */
+  lu_byte insidetbc;  /* true if inside the scope of a defer stmt (i.e. defer closure var) */
 } BlockCnt;
 
 
@@ -442,6 +443,7 @@ static void enterblock (FuncState *fs, BlockCnt *bl, lu_byte isloop) {
   bl->firstlabel = fs->ls->dyd->label.n;
   bl->firstgoto = fs->ls->dyd->gt.n;
   bl->upval = 0;
+  bl->insidetbc = (fs->bl != NULL && fs->bl->insidetbc);
   bl->previous = fs->bl;
   fs->bl = bl;
   lua_assert(fs->freereg == fs->nactvar);
@@ -1518,6 +1520,7 @@ static void localfunc (LexState *ls, int defer) {
     static const char funcname[] = "(deferred function)";
     new_localvar(ls, luaX_newstring(ls, funcname, sizeof funcname-1));  /* new local variable */
     markupval(fs, fs->nactvar);
+    fs->bl->insidetbc = 1;  /* in the scope of a defer closure variable */
   } else {
     new_localvar(ls, str_checkname(ls));  /* new local variable */
   }
@@ -1601,7 +1604,7 @@ static void retstat (LexState *ls) {
     nret = explist(ls, &e);  /* optional return values */
     if (hasmultret(e.k)) {
       luaK_setmultret(fs, &e);
-      if (e.k == VCALL && nret == 1) {  /* tail call? */
+      if (e.k == VCALL && nret == 1 && !fs->bl->insidetbc) {  /* tail call? */
         SET_OPCODE(getinstruction(fs,&e), OP_TAILCALL);
         lua_assert(GETARG_A(getinstruction(fs,&e)) == fs->nactvar);
       }

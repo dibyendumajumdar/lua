@@ -98,6 +98,10 @@ void luaD_seterrorobj (lua_State *L, int errcode, StkId oldtop) {
       setsvalue2s(L, oldtop, luaS_newliteral(L, "error in error handling"));
       break;
     }
+    case CLOSEPROTECT: {
+      setnilvalue(oldtop);  /* no error message */
+      break;
+    }
     default: {
       setobjs2s(L, oldtop, L->top - 1);  /* error message on current top */
       break;
@@ -114,6 +118,7 @@ l_noret luaD_throw (lua_State *L, int errcode) {
   }
   else {  /* thread has no error handler */
     global_State *g = G(L);
+    errcode = luaF_close(L, L->stack, errcode);  /* close all upvalues */
     L->status = cast_byte(errcode);  /* mark it as dead */
     if (g->mainthread->errorJmp) {  /* main thread has a handler? */
       setobjs2s(L, g->mainthread->top++, L->top - 1);  /* copy error obj. */
@@ -662,19 +667,17 @@ LUA_API int lua_resume (lua_State *L, lua_State *from, int nargs) {
   L->nny = 0;  /* allow yields */
   api_checknelems(L, (L->status == LUA_OK) ? nargs + 1 : nargs);
   status = luaD_rawrunprotected(L, resume, &nargs);
-  if (status == -1)  /* error calling 'lua_resume'? */
-    status = LUA_ERRRUN;
-  else {  /* continue running after recoverable errors */
-    while (errorstatus(status) && recover(L, status)) {
-      /* unroll continuation */
-      status = luaD_rawrunprotected(L, unroll, &status);
-    }
-    if (errorstatus(status)) {  /* unrecoverable error? */
-      L->status = cast_byte(status);  /* mark thread as 'dead' */
-      luaD_seterrorobj(L, status, L->top);  /* push error message */
-      L->ci->top = L->top;
-    }
-    else lua_assert(status == L->status);  /* normal end or yield */
+  /* continue running after recoverable errors */
+  while (errorstatus(status) && recover(L, status)) {
+    /* unroll continuation */
+    status = luaD_rawrunprotected(L, unroll, &status);
+  }
+  if (!errorstatus(status))
+    lua_assert(status == L->status);  /* normal end or yield */
+  else {  /* unrecoverable error */
+    L->status = cast_byte(status);  /* mark thread as 'dead' */
+    luaD_seterrorobj(L, status, L->top);  /* push error message */
+    L->ci->top = L->top;
   }
   L->nny = oldnny;  /* restore 'nny' */
   L->nCcalls--;

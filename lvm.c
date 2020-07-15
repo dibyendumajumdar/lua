@@ -1159,7 +1159,7 @@ void luaV_execute (lua_State *L) {
           StkId lim = nci->u.l.base + getproto(nfunc)->numparams;
           int aux;
           /* close all upvalues from previous call */
-          if (cl->p->sizep > 0) Protect(luaF_close(L, oci->u.l.base, LUA_OK));
+          if (cl->p->sizep > 0) Protect(luaF_close(L, oci->u.l.base, NOCLOSINGMETH));
           /* move new frame into old one */
           for (aux = 0; nfunc + aux < lim; aux++)
             setobjs2s(L, ofunc + aux, nfunc + aux);
@@ -1175,7 +1175,10 @@ void luaV_execute (lua_State *L) {
       }
       vmcase(OP_RETURN) {
         int b = GETARG_B(i);
-        if (cl->p->sizep > 0) Protect(luaF_close(L, base, LUA_OK));
+        if (cl->p->sizep > 0) {
+          Protect(luaF_close(L, base, LUA_OK));
+          ra = RA(i);
+        }
         b = luaD_poscall(L, ci, ra, (b != 0 ? b - 1 : cast_int(L->top - ra)));
         if (ci->callstatus & CIST_FRESH)  /* local 'ci' still from callee */
           return;  /* external invocation: return */

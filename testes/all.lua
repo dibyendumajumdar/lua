@@ -184,6 +184,7 @@ dofile('sort.lua', true)
 dofile('bitwise.lua')
 assert(dofile('verybig.lua', true) == 10); collectgarbage()
 dofile('files.lua')
+dofile('defer.lua')
 
 if #msgs > 0 then
   print("\ntests not performed:")
