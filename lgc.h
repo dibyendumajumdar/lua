@@ -1,5 +1,5 @@
 /*
-** $Id: lgc.h,v 2.98 2017/05/26 19:14:29 roberto Exp roberto $
+** $Id: lgc.h $
 ** Garbage Collector
 ** See Copyright Notice in lua.h
 */
@@ -57,7 +57,7 @@
 /*
 ** some useful bit tricks
 */
-#define resetbits(x,m)		((x) &= cast(lu_byte, ~(m)))
+#define resetbits(x,m)		((x) &= cast_byte(~(m)))
 #define setbits(x,m)		((x) |= (m))
 #define testbits(x,m)		((x) & (m))
 #define bitmask(b)		(1<<(b))
@@ -69,13 +69,14 @@
 
 /*
 ** Layout for bit use in 'marked' field. First three bits are
-** used for object "age" in generational mode.
+** used for object "age" in generational mode. Last bit is free
+** to be used by respective objects.
 */
 #define WHITE0BIT	3  /* object is white (type 0) */
 #define WHITE1BIT	4  /* object is white (type 1) */
 #define BLACKBIT	5  /* object is black */
 #define FINALIZEDBIT	6  /* object has been marked for finalization */
-#define TESTGRAYBIT	7  /* used by tests (luaL_checkmemory) */
+
 
 
 #define WHITEBITS	bit2mask(WHITE0BIT, WHITE1BIT)
@@ -95,7 +96,7 @@
 #define changewhite(x)	((x)->marked ^= WHITEBITS)
 #define gray2black(x)	l_setbit((x)->marked, BLACKBIT)
 
-#define luaC_white(g)	cast(lu_byte, (g)->currentwhite & WHITEBITS)
+#define luaC_white(g)	cast_byte((g)->currentwhite & WHITEBITS)
 
 
 /* object age in generational mode */
@@ -119,14 +120,14 @@
 
 /* Default Values for GC parameters */
 #define LUAI_GENMAJORMUL         100
-#define LUAI_GENMINORMUL         12
+#define LUAI_GENMINORMUL         20
 
 /* wait memory to double before starting new cycle */
-#define LUAI_GCPAUSE    200     /* 200% */
+#define LUAI_GCPAUSE    200
 
 /*
-** gc parameters are stored divided by 4 to allow a maximum value larger
-** than 1000 in an 'lu_byte'.
+** some gc parameters are stored divided by 4 to allow a maximum value
+** up to 1023 in a 'lu_byte'.
 */
 #define getgcparam(p)	((p) * 4)
 #define setgcparam(p,v)	((p) = (v) / 4)
@@ -136,6 +137,13 @@
 /* how much to allocate before next GC step (log2) */
 #define LUAI_GCSTEPSIZE 13      /* 8 KB */
 
+
+/*
+** Check whether the declared GC mode is generational. While in
+** generational mode, the collector can go temporarily to incremental
+** mode to improve performance. This is signaled by 'g->lastatomic != 0'.
+*/
+#define isdecGCmodegen(g)	(g->gckind == KGC_GEN || g->lastatomic != 0)
 
 /*
 ** Does one step of collection when debt becomes positive. 'pre'/'pos'
@@ -163,9 +171,6 @@
 	(isblack(p) && iswhite(o)) ? \
 	luaC_barrier_(L,obj2gco(p),obj2gco(o)) : cast_void(0))
 
-#define luaC_protobarrier(L,p,o) \
-	(isblack(p) ? luaC_protobarrier_(L,p) : cast_void(0))
-
 LUAI_FUNC void luaC_fix (lua_State *L, GCObject *o);
 LUAI_FUNC void luaC_freeallobjects (lua_State *L);
 LUAI_FUNC void luaC_step (lua_State *L);
@@ -173,8 +178,7 @@ LUAI_FUNC void luaC_runtilstate (lua_State *L, int statesmask);
 LUAI_FUNC void luaC_fullgc (lua_State *L, int isemergency);
 LUAI_FUNC GCObject *luaC_newobj (lua_State *L, int tt, size_t sz);
 LUAI_FUNC void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v);
-LUAI_FUNC void luaC_barrierback_ (lua_State *L, Table *o);
-LUAI_FUNC void luaC_protobarrier_ (lua_State *L, Proto *p);
+LUAI_FUNC void luaC_barrierback_ (lua_State *L, GCObject *o);
 LUAI_FUNC void luaC_checkfinalizer (lua_State *L, GCObject *o, Table *mt);
 LUAI_FUNC void luaC_changemode (lua_State *L, int newmode);
 

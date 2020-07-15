@@ -1,5 +1,5 @@
 /*
-** $Id: llimits.h,v 1.147 2017/12/11 18:53:53 roberto Exp roberto $
+** $Id: llimits.h $
 ** Limits, basic types, and some other 'installation-dependent' definitions
 ** See Copyright Notice in lua.h
 */
@@ -14,6 +14,7 @@
 
 #include "lua.h"
 
+
 /*
 ** 'lu_mem' and 'l_mem' are unsigned/signed integers big enough to count
 ** the total memory used by Lua (in bytes). Usually, 'size_t' and
@@ -22,7 +23,7 @@
 #if defined(LUAI_MEM)		/* { external definitions? */
 typedef LUAI_UMEM lu_mem;
 typedef LUAI_MEM l_mem;
-#elif LUAI_BITSINT >= 32	/* }{ */
+#elif LUAI_IS32INT	/* }{ */
 typedef size_t lu_mem;
 typedef ptrdiff_t l_mem;
 #else  /* 16-bit ints */	/* }{ */
@@ -39,7 +40,7 @@ typedef signed char ls_byte;
 /* maximum value for size_t */
 #define MAX_SIZET	((size_t)(~(size_t)0))
 
-/* maximum size visible for Lua (must be representable in a lua_Integer */
+/* maximum size visible for Lua (must be representable in a lua_Integer) */
 #define MAX_SIZE	(sizeof(size_t) < sizeof(lua_Integer) ? MAX_SIZET \
                           : (size_t)(LUA_MAXINTEGER))
 
@@ -60,6 +61,16 @@ typedef signed char ls_byte;
 
 
 /*
+** test whether an unsigned value is a power of 2 (or zero)
+*/
+#define ispow2(x)	(((x) & ((x) - 1)) == 0)
+
+
+/* number of chars of a literal string without the ending \0 */
+#define LL(x)   (sizeof(x)/sizeof(char) - 1)
+
+
+/*
 ** conversion of pointer to unsigned integer:
 ** this is for hashing only; there is no problem if the integer
 ** cannot hold the whole pointer value
@@ -73,7 +84,15 @@ typedef LUAI_UACNUMBER l_uacNumber;
 typedef LUAI_UACINT l_uacInt;
 
 
-/* internal assertions for in-house debugging */
+/*
+** Internal assertions for in-house debugging
+*/
+#if defined LUAI_ASSERT
+#undef NDEBUG
+#include <assert.h>
+#define lua_assert(c)           assert(c)
+#endif
+
 #if defined(lua_assert)
 #define check_exp(c,e)		(lua_assert(c), (e))
 /* to avoid problems with conditions too long */
@@ -88,7 +107,7 @@ typedef LUAI_UACINT l_uacInt;
 ** assertion for checking API calls
 */
 #if !defined(luai_apicheck)
-#define luai_apicheck(l,e)	lua_assert(e)
+#define luai_apicheck(l,e)	((void)l, lua_assert(e))
 #endif
 
 #define api_check(l,e,msg)	luai_apicheck(l,(e) && msg)
@@ -104,10 +123,15 @@ typedef LUAI_UACINT l_uacInt;
 #define cast(t, exp)	((t)(exp))
 
 #define cast_void(i)	cast(void, (i))
-#define cast_byte(i)	cast(lu_byte, (i))
+#define cast_voidp(i)	cast(void *, (i))
 #define cast_num(i)	cast(lua_Number, (i))
 #define cast_int(i)	cast(int, (i))
+#define cast_uint(i)	cast(unsigned int, (i))
+#define cast_byte(i)	cast(lu_byte, (i))
 #define cast_uchar(i)	cast(unsigned char, (i))
+#define cast_char(i)	cast(char, (i))
+#define cast_charp(i)	cast(char *, (i))
+#define cast_sizet(i)	cast(size_t, (i))
 
 
 /* cast a signed lua_Integer to lua_Unsigned */
@@ -126,8 +150,26 @@ typedef LUAI_UACINT l_uacInt;
 
 
 /*
+** macros to improve jump prediction (used mainly for error handling)
+*/
+#if !defined(likely)
+
+#if defined(__GNUC__)
+#define likely(x)	(__builtin_expect(((x) != 0), 1))
+#define unlikely(x)	(__builtin_expect(((x) != 0), 0))
+#else
+#define likely(x)	(x)
+#define unlikely(x)	(x)
+#endif
+
+#endif
+
+
+/*
 ** non-return type
 */
+#if !defined(l_noret)
+
 #if defined(__GNUC__)
 #define l_noret		void __attribute__((noreturn))
 #elif defined(_MSC_VER) && _MSC_VER >= 1200
@@ -136,28 +178,20 @@ typedef LUAI_UACINT l_uacInt;
 #define l_noret		void
 #endif
 
-
-
-/*
-** maximum depth for nested C calls and syntactical nested non-terminals
-** in a program. (Value must fit in an unsigned short int. It must also
-** be compatible with the size of the C stack.)
-*/
-#if !defined(LUAI_MAXCCALLS)
-#define LUAI_MAXCCALLS		2200
 #endif
-
 
 
 /*
 ** type for virtual-machine instructions;
 ** must be an unsigned with (at least) 4 bytes (see details in lopcodes.h)
 */
-#if LUAI_BITSINT >= 32
-typedef unsigned int Instruction;
+#if LUAI_IS32INT
+typedef unsigned int l_uint32;
 #else
-typedef unsigned long Instruction;
+typedef unsigned long l_uint32;
 #endif
+
+typedef l_uint32 Instruction;
 
 
 
@@ -263,15 +297,20 @@ typedef unsigned long Instruction;
 #endif
 
 /*
-** modulo: defined as 'a - floor(a/b)*b'; this definition gives NaN when
-** 'b' is huge, but the result should be 'a'. 'fmod' gives the result of
-** 'a - trunc(a/b)*b', and therefore must be corrected when 'trunc(a/b)
-** ~= floor(a/b)'. That happens when the division has a non-integer
-** negative result, which is equivalent to the test below.
+** modulo: defined as 'a - floor(a/b)*b'; the direct computation
+** using this definition has several problems with rounding errors,
+** so it is better to use 'fmod'. 'fmod' gives the result of
+** 'a - trunc(a/b)*b', and therefore must be corrected when
+** 'trunc(a/b) ~= floor(a/b)'. That happens when the division has a
+** non-integer negative result: non-integer result is equivalent to
+** a non-zero remainder 'm'; negative result is equivalent to 'a' and
+** 'b' with different signs, or 'm' and 'b' with different signs
+** (as the result 'm' of 'fmod' has the same sign of 'a').
 */
 #if !defined(luai_nummod)
 #define luai_nummod(L,a,b,m)  \
-  { (m) = l_mathop(fmod)(a,b); if ((m)*(b) < 0) (m) += (b); }
+  { (void)L; (m) = l_mathop(fmod)(a,b); \
+    if (((m) > 0) ? (b) < 0 : ((m) < 0 && (b) > 0)) (m) += (b); }
 #endif
 
 /* exponentiation */
@@ -288,6 +327,8 @@ typedef unsigned long Instruction;
 #define luai_numeq(a,b)         ((a)==(b))
 #define luai_numlt(a,b)         ((a)<(b))
 #define luai_numle(a,b)         ((a)<=(b))
+#define luai_numgt(a,b)         ((a)>(b))
+#define luai_numge(a,b)         ((a)>=(b))
 #define luai_numisnan(a)        (!luai_numeq((a), (a)))
 #endif
 

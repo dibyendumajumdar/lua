@@ -1,5 +1,5 @@
 /*
-** $Id: ltests.h,v 2.54 2017/12/07 18:51:39 roberto Exp roberto $
+** $Id: ltests.h $
 ** Internal Header for Debugging of the Lua Implementation
 ** See Copyright Notice in lua.h
 */
@@ -13,30 +13,20 @@
 
 /* test Lua with compatibility code */
 #define LUA_COMPAT_MATHLIB
-#define LUA_COMPAT_IPAIRS
-#define LUA_COMPAT_BITLIB
-#define LUA_COMPAT_APIINTCASTS
-#define LUA_COMPAT_FLOATSTRING
-#define LUA_COMPAT_UNPACK
-#define LUA_COMPAT_LOADERS
-#define LUA_COMPAT_LOG10
-#define LUA_COMPAT_LOADSTRING
-#define LUA_COMPAT_MAXN
-#define LUA_COMPAT_MODULE
+#define LUA_COMPAT_LT_LE
 
 
 #define LUA_DEBUG
 
 
 /* turn on assertions */
-#undef NDEBUG
-#include <assert.h>
-#define lua_assert(c)           assert(c)
+#define LUAI_ASSERT
+
 
 
 /* compiled with -O0, Lua uses a lot of C stack space... */
-#undef LUAI_MAXCCALLS
-#define LUAI_MAXCCALLS	200
+#undef LUAI_MAXCSTACK
+#define LUAI_MAXCSTACK		400
 
 /* to avoid warnings, and to make sure value is really unused */
 #define UNUSED(x)       (x=0, (void)(x))
@@ -51,6 +41,14 @@
 #endif
 
 
+/* get a chance to test code without jump tables */
+#define LUA_USE_JUMPTABLE	0
+
+
+/* use 32-bit integers in random generator */
+#define LUA_RAND32
+
+
 /* memory-allocator control variables */
 typedef struct Memcontrol {
   unsigned long numblocks;
@@ -58,7 +56,7 @@ typedef struct Memcontrol {
   unsigned long maxmem;
   unsigned long memlimit;
   unsigned long countlimit;
-  unsigned long objcount[LUA_NUMTAGS];
+  unsigned long objcount[LUA_NUMTYPES];
 } Memcontrol;
 
 LUA_API Memcontrol l_memcontrol;
@@ -116,8 +114,13 @@ LUA_API void *debug_realloc (void *ud, void *block,
 #undef LUAL_BUFFERSIZE
 #define LUAL_BUFFERSIZE		23
 #define MINSTRTABSIZE		2
-#define MAXINDEXRK		1
 #define MAXIWTHABS		3
+
+#define STRCACHE_N	23
+#define STRCACHE_M	5
+
+#undef LUAI_USER_ALIGNMENT_T
+#define LUAI_USER_ALIGNMENT_T   union { char b[sizeof(void*) * 8]; }
 
 
 /* make stack-overflow tests run faster */
@@ -125,12 +128,10 @@ LUA_API void *debug_realloc (void *ud, void *block,
 #define LUAI_MAXSTACK   50000
 
 
-#undef LUAI_USER_ALIGNMENT_T
-#define LUAI_USER_ALIGNMENT_T   union { char b[sizeof(void*) * 8]; }
+/* force Lua to use its own implementations */
+#undef lua_strx2number
+#undef lua_number2strx
 
-
-#define STRCACHE_N	23
-#define STRCACHE_M	5
 
 #endif
 
