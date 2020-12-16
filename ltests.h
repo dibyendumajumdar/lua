@@ -23,11 +23,6 @@
 #define LUAI_ASSERT
 
 
-
-/* compiled with -O0, Lua uses a lot of C stack space... */
-#undef LUAI_MAXCSTACK
-#define LUAI_MAXCSTACK		400
-
 /* to avoid warnings, and to make sure value is really unused */
 #define UNUSED(x)       (x=0, (void)(x))
 
@@ -51,6 +46,7 @@
 
 /* memory-allocator control variables */
 typedef struct Memcontrol {
+  int failnext;
   unsigned long numblocks;
   unsigned long total;
   unsigned long maxmem;
@@ -72,7 +68,13 @@ extern void *l_Trick;
 /*
 ** Function to traverse and check all memory used by Lua
 */
-int lua_checkmemory (lua_State *L);
+LUAI_FUNC int lua_checkmemory (lua_State *L);
+
+/*
+** Function to print an object GC-friendly
+*/
+struct GCObject;
+LUAI_FUNC void lua_printobj (lua_State *L, struct GCObject *o);
 
 
 /* test for lock/unlock */
